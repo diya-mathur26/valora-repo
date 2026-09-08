@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Valora — Ground Truth Engine</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+</head>
+<body>
+
+<nav>
+  <div class="logo">VALORA</div>
+  <div class="links">
+    <a href="#demo">Relationship Check</a>
+    <a href="#indiv">Document Check</a>
+    <a href="#graph">Trust Graph</a>
+    <a href="#marketplace">Lender Marketplace</a>
+    <a href="#evidence">Ground Truth</a>
+  </div>
+</nav>
+
+<div class="align-banner">
+  Built for <strong>Track 1 — Trust Scoring for the Credit-Invisible:</strong> establishing trust using signals beyond a traditional credit score.
+</div>
+
+<header class="hero">
+  <div class="eyebrow">GROUND TRUTH ENGINE — BFSI / MSME LENDING</div>
+  <h1>The paperwork already exists. Nobody had checked it against itself.</h1>
+  <p>A transporter's e-way bill trail and a warehouse's own activity log are two records of the same relationship, filed independently, by law. Valora cross-reads them — and turns the match into a trust score lenders can act on today.</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="#demo">Run a live verification</a>
+    <a class="btn btn-ghost" href="#graph">See the trust graph</a>
+  </div>
+</header>
+
+<div class="ticker">
+  <div class="ticker-inner" id="tickerInner"></div>
+</div>
+
+<section id="demo">
+  <div class="wrap">
+    <div class="sec-head"><h2>Relationship verification</h2></div>
+    <div class="sec-num">01 / LIVE DEMO</div>
+    <p class="sec-sub">Pick a scenario. The engine reads both sides and returns four independent verdicts before it commits to a single score — the same structure a credit officer would use to question the model.</p>
+
+    <div class="scenario-row">
+      <button class="scenario-btn active" onclick="setScenario('aligned', this)">Aligned — likely real</button>
+      <button class="scenario-btn" onclick="setScenario('partial', this)">Partial — timing gap</button>
+      <button class="scenario-btn" onclick="setScenario('mismatch', this)">Mismatch — likely fabricated</button>
+    </div>
+
+    <div class="demo-grid">
+      <div class="doc-panel">
+        <h4>Transporter e-way bill trail</h4>
+        <div class="sub">Filed with GST authorities — cannot be edited after generation</div>
+        <textarea id="ewayText" readonly></textarea>
+      </div>
+      <div class="doc-panel">
+        <h4>Warehouse activity log</h4>
+        <div class="sub">Filed by the warehouse operator, independently</div>
+        <textarea id="warehouseText" readonly></textarea>
+      </div>
+    </div>
+
+    <button class="run-btn" id="runBtn" onclick="runCheck()">Run Ground Truth check</button>
+
+    <div class="verdict-grid" id="verdictGrid"></div>
+
+    <div class="score-row" id="scoreRow" style="display:none;">
+      <div class="score-dial">
+        <svg width="150" height="150" viewBox="0 0 150 150">
+          <circle cx="75" cy="75" r="66" fill="none" stroke="#2A2F36" stroke-width="10"/>
+          <circle id="scoreArc" cx="75" cy="75" r="66" fill="none" stroke="#3ED9A8" stroke-width="10" stroke-linecap="round" stroke-dasharray="415" stroke-dashoffset="415" transform="rotate(-90 75 75)"/>
+        </svg>
+        <div class="score-num"><span class="n" id="scoreNum">–</span><span class="l">RELATIONAL TRUST</span></div>
+      </div>
+      <div class="score-synth" id="scoreSynth"></div>
+    </div>
+
+    <div class="ai-explain-box" id="aiExplainBox" style="display:none;">
+      <div class="ai-explain-label">AI REASONING LAYER <span id="aiSourceTag">— local</span></div>
+      <div id="aiExplainText">Generating...</div>
+    </div>
+
+    <button class="run-btn" id="routeBtn" style="display:none; background:none; border:1px solid var(--mint); color:var(--mint);" onclick="goToMarketplace()">Send this verified profile to lenders →</button>
+
+    <button class="cert-btn" id="certBtn" onclick="downloadCert()">Export Ground Truth Certificate ↓</button>
+  </div>
+</section>
+
+<section id="indiv">
+  <div class="wrap">
+    <div class="sec-head"><h2>Individual document check</h2></div>
+    <div class="sec-num">02 / SINGLE-SIDE</div>
+    <p class="sec-sub">Before two records can be cross-read, each one has to hold up on its own — plausible GSTIN, a well-formed e-way bill number, a date and value that make sense together. This runs on one document, with no counterpart to compare against.</p>
+
+    <div class="demo-grid">
+      <div class="doc-panel">
+        <h4>Paste a document</h4>
+        <div class="sub">e-way bill, GST return excerpt, or warehouse gate-entry record</div>
+        <textarea id="singleDoc">GSTIN: 27AASFS1234K1Z9
+E-way Bill #: EWB-4471829301
+Date: 2026-08-14
+Origin: Nashik, MH
+Destination: Bhiwandi Logistics Park, MH
+Consignee (warehouse): Vishal Warehousing Pvt Ltd
+Goods value: INR 6,40,000
+Vehicle: MH15 AT 4521</textarea>
+        <button class="run-btn" style="margin-top:14px;" onclick="checkSingle()">Check plausibility</button>
+      </div>
+      <div class="doc-panel">
+        <h4 style="color:var(--red);">Structural issues found</h4>
+        <div id="singleFindings" style="font-size:13px; color:var(--text-soft); line-height:1.7;">Findings will appear here.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="graph">
+  <div class="wrap">
+    <div class="sec-head"><h2>The trust graph</h2></div>
+    <div class="sec-num">03 / THE MOAT</div>
+    <p class="sec-sub">Every completed check adds one edge. A competitor can copy the model overnight — nobody can copy a graph of real, verified relationships.</p>
+
+    <div class="graph-controls">
+      <button class="run-btn" style="width:auto; margin-bottom:0;" onclick="simulateGrowth()">▶ Simulate 12 months of growth</button>
+      <button class="btn btn-ghost" onclick="resetGraphSim()">Reset</button>
+    </div>
+
+    <div class="graph-stats">
+      <div>VERIFIED BUSINESSES<b id="statBiz">3</b></div>
+      <div>EST. CREDIT UNLOCKED<b id="statCredit">₹18L</b></div>
+      <div>AVG TURNAROUND<b id="statTAT">4.2 wks</b></div>
+    </div>
+
+    <div id="graphBox">
+      <div class="month-label" id="monthLabel">MONTH 0</div>
+      <svg id="graphSvg" width="100%" height="100%"></svg>
+    </div>
+  </div>
+</section>
+
+<section id="marketplace">
+  <div class="wrap">
+    <div class="sec-head"><h2>Lender marketplace</h2></div>
+    <div class="sec-num">04 / AFTER VERIFICATION</div>
+    <p class="sec-sub">This is what a lender sees once a profile clears verification — the score, the reasoning behind it, and where it's competing against other lenders for the same borrower.</p>
+
+    <div id="marketEmpty" style="color:var(--text-soft); font-size:14px; padding:40px 0; text-align:center; border:1px dashed var(--line); border-radius:10px;">
+      Run a verification above, then click "Send this verified profile to lenders" to see it routed here.
+    </div>
+
+    <div id="marketContent" style="display:none;">
+      <div class="doc-panel" style="margin-bottom:20px;">
+        <h4 id="marketBizName">—</h4>
+        <div class="sub">Verified profile — Ground Truth Score <span id="marketScore" style="color:var(--mint); font-weight:700;">–</span>/100</div>
+      </div>
+      <div class="offers-row" id="marketOffers"></div>
+    </div>
+  </div>
+</section>
+
+<section id="evidence" style="border-bottom:none;">
+  <div class="wrap">
+    <div class="sec-head"><h2>Why we call this Ground Truth</h2></div>
+    <div class="sec-num">05 / EVIDENCE</div>
+    <p class="sec-sub">Every number below is either a published figure or labelled as direct interview testimony — nothing here is invented to make the pitch sound better.</p>
+
+    <div class="evidence-grid">
+      <div class="ev-card"><div class="n">60–70%</div><div class="d">of India's warehousing sector is unorganized</div><div class="s">BusinessWorld, 2025</div></div>
+      <div class="ev-card"><div class="n">75%</div><div class="d">of India's trucking fleet operates five trucks or fewer</div><div class="s">RedSeer, "Unlocking Growth in India's Fragmented Trucking Sector," 2025</div></div>
+      <div class="ev-card"><div class="n">130M+</div><div class="d">e-way bills generated every month, an all-time high</div><div class="s">GSTN data, via Business Standard, 2026</div></div>
+      <div class="ev-card"><div class="n">$397.5B</div><div class="d">India's MSME credit gap — ~15% of GDP</div><div class="s">IFC study, corroborated by Business Standard</div></div>
+      <div class="ev-card"><div class="n">$25B→$41B</div><div class="d">India's warehousing market, today to 2031</div><div class="s">Mordor Intelligence</div></div>
+      <div class="ev-card"><div class="n">2–8 wks</div><div class="d">time a warehouse financing check can take once documentation gaps appear</div><div class="s">Direct interview, two lending professionals — testimony, not published data</div></div>
+    </div>
+
+    <div class="honest-box">
+      <h3>What we're honest about</h3>
+      <ul>
+        <li>Consent-based e-way bill access at the granularity we need isn't proven at scale yet — that's what a pilot is for.</li>
+        <li>The relationship-graph model that scores risk from a borrower's network, not just their own file, needs real verified businesses in the system before it can learn anything. It isn't running today.</li>
+        <li>The 2–8 week delay figure is one lending professional's account, not a published statistic — labelled as such everywhere it's used.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>VALORA — Built $ Bank 2026, Track 1 · Trust Scoring for the Credit-Invisible</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
