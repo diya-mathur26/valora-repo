@@ -22,13 +22,13 @@ exports.handler = async function (event) {
       return { statusCode: 400, body: JSON.stringify({ error: "Missing prompt" }) };
     }
 
-    // Use ONE model only, with a hard timeout well under Netlify's function limit.
-    // Trying multiple models one after another causes the whole function to time out,
-    // because each attempt eats into the same 10-second budget.
-    const MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free";
+    // Use OpenRouter's free model auto-router: it picks a currently-working free model
+    // for you, so we don't depend on one specific model slug staying available or fast.
+    // Only ONE call is made (no looping), with a hard timeout well under Netlify's limit.
+    const MODEL = "openrouter/free";
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000); // 8s safety margin under the 10s limit
+    const timeout = setTimeout(() => controller.abort(), 7000); // leaves more buffer under Netlify's 10s limit
 
     let res;
     try {
