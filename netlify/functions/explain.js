@@ -7,7 +7,14 @@ exports.handler = async function (event) {
     return { statusCode: 405, body: "Method not allowed" };
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY; // <-- paste your real OpenRouter key here
+  const apiKey = process.env.OPENROUTER_API_KEY;
+
+  if (!apiKey) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "OPENROUTER_API_KEY is not set in environment variables." })
+    };
+  }
 
   try {
     const { prompt } = JSON.parse(event.body || "{}");
@@ -15,57 +22,65 @@ exports.handler = async function (event) {
       return { statusCode: 400, body: JSON.stringify({ error: "Missing prompt" }) };
     }
 
-    // NOTE: OpenRouter's free model IDs rotate over time and get retired without
-    // notice. Instead of relying on one slug, try a short list in order and use
-    // whichever one is currently live. If all fail, check https://openrouter.ai/models
-    // (filter by "Free") for current :free slugs and update this list.
-    const MODELS = [
-      "nvidia/nemotron-3-ultra-550b-a55b:free",
-      "poolside/laguna-s-2.1:free",
-      "nvidia/nemotron-3-super-120b-a12b:free"
-    ];
+    // Use ONE model only, with a hard timeout well under Netlify's function limit.
+    // Trying multiple models one after another causes the whole function to time out,
+    // because each attempt eats into the same 10-second budget.
+    const MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free";
 
-    let lastError = null;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000); // 8s safety margin under the 10s limit
 
-    for (const model of MODELS) {
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    let res;
+    try {
+      res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model,
+          model: MODEL,
           messages: [{ role: "user", content: prompt }]
-        })
+        }),
+        signal: controller.signal
       });
-
-      const data = await res.json();
-
-      if (data?.error) {
-        lastError = data.error.message || JSON.stringify(data.error);
-        continue; // try the next model
-      }
-
-      const text = data?.choices?.[0]?.message?.content || null;
-      if (text) {
-        return {
-          statusCode: 200,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, modelUsed: model })
-        };
-      }
-      lastError = "Model returned no content.";
+    } finally {
+      clearTimeout(timeout);
     }
 
-    // Every model in the list failed — surface the last real error instead of
-    // silently returning null, so this doesn't hide the failure again.
+    const data = await res.json();
+
+    if (data?.error) {
+      return {
+        statusCode: 502,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ error: data.error.message || JSON.stringify(data.error) })
+      };
+    }
+
+    const text = data?.choices?.[0]?.message?.content || null;
+
+    if (!text) {
+      return {
+        statusCode: 502,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ error: "Model returned no content." })
+      };
+    }
+
     return {
-      statusCode: 502,
+      statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: `All fallback models failed. Last error: ${lastError}` })
+      body: JSON.stringify({ text, modelUsed: MODEL })
     };
   } catch (err) {
+    if (err.name === "AbortError") {
+      return {
+        statusCode: 504,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ error: "Model request timed out." })
+      };
+    }
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
